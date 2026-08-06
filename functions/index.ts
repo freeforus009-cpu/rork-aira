@@ -1,10 +1,12 @@
 import { AuthRoom } from "./auth-room";
 import { SyncRoom } from "./sync-room";
 import { ChatRoom } from "./chat-room";
+import { ApiRoom } from "./api-room";
 
 export { AuthRoom } from "./auth-room";
 export { SyncRoom } from "./sync-room";
 export { ChatRoom } from "./chat-room";
+export { ApiRoom } from "./api-room";
 
 type Env = { DO: Fetcher };
 
@@ -51,6 +53,17 @@ export default {
       }
       // Use a shared DO instance so all users on the same ChatRoom can communicate in real-time
       return dispatch(env, "ChatRoom", "shared", new Request(chatRequest.toString(), forwarded));
+    }
+
+    // REST API routes — authenticated, routed to shared ApiRoom DO
+    if (url.pathname.startsWith("/v1/api")) {
+      const session = await validateSession(env, request);
+      if (!session) return json({ error: "Unauthorized" }, 401);
+      const forwarded = new Request(request.url, request);
+      forwarded.headers.set("X-Resolved-User-Id", session.userId);
+      const apiRequest = new URL(request.url);
+      apiRequest.pathname = apiRequest.pathname.replace(/^\/v1\/api/, "") || "/";
+      return dispatch(env, "ApiRoom", "shared", new Request(apiRequest.toString(), forwarded));
     }
 
     const protectedRoute = url.pathname.startsWith("/v1/sync/") || url.pathname.startsWith("/v1/uploads/") || url.pathname === "/v1/uploads";
